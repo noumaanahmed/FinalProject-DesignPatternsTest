@@ -3,18 +3,39 @@ package edu.neu.csye7374;
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
+/**
+ * Demo entry point for the console version.
+ *
+ * Design Pattern: Template Method (overall game loop)
+ * ---------------------------------------------------
+ * The battle loop follows a fixed algorithm with pluggable details:
+ *  1. Show menu and stats
+ *  2. Read player choice
+ *  3. Queue commands in CommandInvoker
+ *  4. Execute commands
+ *  5. Enemy turn
+ *  6. Check win/lose and repeat
+ */
 public class Demo {
 
     public static void gameRun() {
         Scanner sc = new Scanner(System.in);
-        System.out.println("\n\u001B[1m\u001B[35m=== MINI RPG CONSOLE GAME ===\u001B[0m\n");
 
-        // --- Singleton Pattern ---
+        System.out.println();
+        System.out.println("===========================================");
+        System.out.println("           MINI RPG CONSOLE GAME           ");
+        System.out.println("===========================================\n");
+
+        // --- Singleton Pattern in use ---
+        System.out.println("[Pattern] Using Singleton (GameConfig) for difficulty.");
         GameConfig config = GameConfig.getInstance();
-        int diff = readIntInRange(sc, "Enter difficulty (1-Easy, 2-Normal, 3-Hard): ", 1, 3);
+
+        int diff = readIntInRange(sc,
+                "Enter difficulty (1-Easy, 2-Normal, 3-Hard): ",
+                1, 3);
         config.setDifficulty(diff);
 
-        // Goblin HP scaling
+        // Goblin HP scaling based on difficulty
         int goblinHP;
         switch (diff) {
             case 1:
@@ -31,20 +52,29 @@ public class Demo {
                 break;
         }
         if (goblinHP < 1) goblinHP = 1;
-        System.out.println("\nDifficulty set to: " + diff + " | Goblin HP = " + goblinHP + "\n");
 
-        // --- Observer Pattern ---
+        System.out.println();
+        System.out.println("-------------------------------------------");
+        System.out.println("Difficulty set to: " + diff + "  |  Goblin HP = " + goblinHP);
+        System.out.println("-------------------------------------------\n");
+
+        // --- Observer / Bridge Pattern ---
+        System.out.println("[Pattern] Using Observer/Bridge for logging (ConsoleLogger, GUI adapter).");
         ConsoleLogger logger = new ConsoleLogger("GameLogger");
 
-        // --- Factory + Builder Pattern ---
+        // --- Factory + Builder Pattern for Player & Enemy ---
+        System.out.println("[Pattern] Using Factory (CharacterFactory) + Builder (CharacterBuilder) for characters.\n");
+
         System.out.println("Choose your class:");
-        System.out.println("1. Warrior");
-        System.out.println("2. Mage");
+        System.out.println("  1. Warrior");
+        System.out.println("  2. Mage");
         int choice = readIntInRange(sc, "Enter choice: ", 1, 2);
-  
-        System.out.print("Enter your character name: ");
+
+        System.out.print("\nEnter your character name: ");
         String name = sc.nextLine().trim();
-        if (name.isEmpty()) name = "Hero";
+        if (name.isEmpty()) {
+            name = "Hero";
+        }
 
         Character player = (choice == 1)
                 ? CharacterFactory.createCharacter("warrior", name)
@@ -58,77 +88,107 @@ public class Demo {
         enemy.addObserver(logger);
 
         // --- Strategy Pattern ---
-        int strat = readIntInRange(sc, "\nSelect starting strategy:\n1. Aggressive (Attack)\n2. Defensive (Heal)\nEnter choice: ", 1, 2);
-        if (strat == 1)
+        System.out.println();
+        System.out.println("[Pattern] Using Strategy for attack behavior (Aggressive / Defensive).");
+        int strat = readIntInRange(sc,
+                "\nSelect starting strategy:\n"
+                        + "  1. Aggressive (Attack)\n"
+                        + "  2. Defensive (Heal)\n"
+                        + "Enter choice: ",
+                1, 2);
+
+        if (strat == 1) {
             player.setStrategy(new AggressiveAttack());
-        else
+        } else {
             player.setStrategy(new DefensiveAttack());
+        }
         enemy.setStrategy(new AggressiveAttack());
 
         // --- Command Pattern ---
+        System.out.println("[Pattern] Using Command + CommandInvoker to queue actions.\n");
         CommandInvoker invoker = new CommandInvoker();
 
         boolean playing = true;
         while (playing) {
-            System.out.println("\n\u001B[34m---------------------------------------\u001B[0m");
-            System.out.println("\u001B[1m\u001B[34mBATTLE MENU\u001B[0m");
-            System.out.println("---------------------------------------");
-            System.out.println("Current Strategy: [" + playerStrategyName(player) + "]");
-            System.out.println("Player HP: " + player.getHealth() + " | Goblin HP: " + enemy.getHealth() + "\n");
+            // ===== Menu & Status =====
+            System.out.println();
+            System.out.println("===========================================");
+            System.out.println("                 BATTLE MENU               ");
+            System.out.println("===========================================");
+            System.out.println("Current Strategy : [" + playerStrategyName(player) + "]");
+            System.out.println("Player HP        : " + player.getHealth());
+            System.out.println("Goblin HP        : " + enemy.getHealth());
+            System.out.println("-------------------------------------------");
 
             String currentStrat = playerStrategyName(player).toLowerCase();
             if (currentStrat.equals("aggressive")) {
-                System.out.println("1. Attack Enemy");
+                System.out.println("  1. Attack Enemy");
             } else {
-                System.out.println("1. Heal Yourself");
+                System.out.println("  1. Heal Yourself");
             }
-            System.out.println("2. Change Strategy");
-            System.out.println("3. Quit Game");
+            System.out.println("  2. Change Strategy");
+            System.out.println("  3. Quit Game");
 
             int action = readIntInRange(sc, "\nChoose an option: ", 1, 3);
+            System.out.println();
 
             switch (action) {
                 case 1:
-                    if (currentStrat.equals("aggressive"))
-                        invoker.addCommand(() -> player.attack(enemy));
-                    else
-                        invoker.addCommand(() -> player.heal(10));
+                    if (currentStrat.equals("aggressive")) {
+                        invoker.addCommand(new AttackCommand(player, enemy));
+                    } else {
+                        invoker.addCommand(new HealCommand(player, 10));
+                    }
                     break;
 
                 case 2:
-                    int s = readIntInRange(sc, "\nSelect new strategy:\n1. Aggressive (Attack)\n2. Defensive (Heal)\nEnter choice: ", 1, 2);
-                    if (s == 1)
+                    int s = readIntInRange(sc,
+                            "\nSelect new strategy:\n"
+                                    + "  1. Aggressive (Attack)\n"
+                                    + "  2. Defensive (Heal)\n"
+                                    + "Enter choice: ",
+                            1, 2);
+                    if (s == 1) {
                         player.setStrategy(new AggressiveAttack());
-                    else
+                    } else {
                         player.setStrategy(new DefensiveAttack());
-                    System.out.println("\u001B[36mStrategy changed successfully.\u001B[0m");
+                    }
+                    System.out.println("\n[Info] Strategy changed successfully.\n");
                     continue;
 
                 case 3:
-                    System.out.println("\u001B[33mExiting game...\u001B[0m");
+                    System.out.println("[Info] Exiting game...\n");
                     playing = false;
                     continue;
             }
 
+            // Execute all queued commands this turn
             invoker.executeAll();
 
             // Enemy turn
             if (playing && enemy.isAlive() && player.isAlive()) {
-                System.out.println("\n\u001B[31m--- Enemy Turn ---\u001B[0m");
+                System.out.println();
+                System.out.println("--------------- Enemy Turn ---------------");
                 enemy.attack(player);
             }
 
             // Check results
             if (!player.isAlive()) {
-                System.out.println("\n\u001B[31mYou were defeated.\u001B[0m");
+                System.out.println();
+                System.out.println("===========================================");
+                System.out.println("               YOU WERE DEFEATED           ");
+                System.out.println("===========================================\n");
                 playing = false;
             } else if (!enemy.isAlive()) {
-                System.out.println("\n\u001B[32mYou defeated the Goblin!\u001B[0m");
+                System.out.println();
+                System.out.println("===========================================");
+                System.out.println("             YOU DEFEATED GOBLIN           ");
+                System.out.println("===========================================\n");
                 playing = false;
             }
         }
 
-        System.out.println("\n\u001B[35m=== GAME OVER ===\u001B[0m\n");
+        System.out.println("=== GAME OVER ===\n");
         sc.close();
     }
 
@@ -138,6 +198,7 @@ public class Demo {
     }
 
     // --- Helper methods for safe input ---
+
     private static int readInt(Scanner sc, String prompt) {
         while (true) {
             System.out.print(prompt);
@@ -146,7 +207,7 @@ public class Demo {
                 sc.nextLine(); // consume newline
                 return value;
             } catch (InputMismatchException e) {
-                System.out.println("\u001B[33mInvalid input. Please enter a number.\u001B[0m");
+                System.out.println("[Warning] Invalid input. Please enter a number.");
                 sc.nextLine(); // clear invalid input
             }
         }
@@ -158,7 +219,8 @@ public class Demo {
             if (value >= min && value <= max) {
                 return value;
             }
-            System.out.println("\u001B[33mPlease enter a number between " + min + " and " + max + ".\u001B[0m");
+            System.out.println("[Warning] Please enter a number between "
+                    + min + " and " + max + ".");
         }
     }
 }
